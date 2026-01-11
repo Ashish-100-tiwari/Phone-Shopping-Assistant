@@ -271,6 +271,96 @@ export const phoneDatabase: Product[] = [
     cons: ['60Hz display', 'Older design', 'Smaller RAM'],
     rating: 4.3,
   },
+  {
+    id: '16',
+    name: 'Google Pixel 8a',
+    brand: 'Google',
+    price: 52999,
+    specifications: {
+      display: '6.1" OLED',
+      processor: 'Google Tensor G3',
+      ram: '8GB',
+      storage: '128GB',
+      camera: '64MP + 13MP',
+      battery: '4492 mAh',
+      os: 'Android 14',
+    },
+    pros: ['Excellent camera software', 'Pure Android', 'AI features', 'Good value'],
+    cons: ['Tensor chip less powerful', 'Average battery', 'Limited availability'],
+    rating: 4.4,
+  },
+  {
+    id: '17',
+    name: 'OnePlus 12R',
+    brand: 'OnePlus',
+    price: 39999,
+    specifications: {
+      display: '6.78" LTPO AMOLED',
+      processor: 'Snapdragon 8 Gen 2',
+      ram: '8GB',
+      storage: '128GB',
+      camera: '50MP + 8MP + 2MP',
+      battery: '5500 mAh',
+      os: 'OxygenOS 14',
+    },
+    pros: ['Great value', 'Fast charging', 'Good battery', 'Smooth performance'],
+    cons: ['Average camera', 'No wireless charging', 'Plastic frame'],
+    rating: 4.3,
+  },
+  {
+    id: '18',
+    name: 'Samsung Galaxy A15',
+    brand: 'Samsung',
+    price: 14999,
+    specifications: {
+      display: '6.5" Super AMOLED',
+      processor: 'MediaTek Helio G99',
+      ram: '6GB',
+      storage: '128GB',
+      camera: '50MP + 5MP + 2MP',
+      battery: '5000 mAh',
+      os: 'Android 14',
+    },
+    pros: ['Great display', 'Good battery', 'Affordable', 'Reliable brand'],
+    cons: ['Average performance', 'Basic camera', 'Plastic build'],
+    rating: 4.0,
+  },
+  {
+    id: '19',
+    name: 'Redmi Note 13',
+    brand: 'Xiaomi',
+    price: 14999,
+    specifications: {
+      display: '6.67" AMOLED',
+      processor: 'Snapdragon 685',
+      ram: '6GB',
+      storage: '128GB',
+      camera: '108MP + 8MP + 2MP',
+      battery: '5000 mAh',
+      os: 'MIUI 14',
+    },
+    pros: ['Great camera for price', 'Good display', 'Fast charging', 'Value for money'],
+    cons: ['MIUI ads', 'Average performance', 'Software updates'],
+    rating: 4.1,
+  },
+  {
+    id: '20',
+    name: 'Samsung Galaxy S23 FE',
+    brand: 'Samsung',
+    price: 49999,
+    specifications: {
+      display: '6.4" Dynamic AMOLED 2X',
+      processor: 'Exynos 2200',
+      ram: '8GB',
+      storage: '128GB',
+      camera: '50MP + 12MP + 8MP',
+      battery: '4500 mAh',
+      os: 'Android 13',
+    },
+    pros: ['Premium build', 'Vibrant display', 'Versatile camera', 'Samsung ecosystem'],
+    cons: ['Exynos chip less powerful', 'No charger included', 'Older Android version'],
+    rating: 4.3,
+  },
 ];
 
 export interface SearchIntent {
@@ -299,6 +389,9 @@ export function parseIntent(query: string): SearchIntent {
         intent.budget = { max: amount };
       } else if (pattern.source.includes('above') || pattern.source.includes('over') || pattern.source.includes('min')) {
         intent.budget = { min: amount };
+      } else if (pattern.source.includes('around') || pattern.source.includes('about') || pattern.source.includes('approximately')) {
+        // For "around ₹15k", set a range of ±20%
+        intent.budget = { min: Math.floor(amount * 0.8), max: Math.ceil(amount * 1.2) };
       } else if (match[2]) {
         const amount2 = parseInt(match[2]) * (match[2].length <= 3 ? 1000 : 1);
         intent.budget = { min: Math.min(amount, amount2), max: Math.max(amount, amount2) };
@@ -347,6 +440,15 @@ export function parseIntent(query: string): SearchIntent {
     'wireless charging': 'wireless charging',
     'waterproof': 'waterproof',
     'water resistant': 'waterproof',
+    'compact': 'compact',
+    'one-hand': 'compact',
+    'one hand': 'compact',
+    'small': 'compact',
+    'lightweight': 'compact',
+    'ois': 'ois',
+    'optical image stabilization': 'ois',
+    'eis': 'eis',
+    'electronic image stabilization': 'eis',
   };
 
   const foundFeatures: string[] = [];
@@ -376,6 +478,17 @@ export function parseIntent(query: string): SearchIntent {
 }
 
 export function searchPhones(intent: SearchIntent, limit: number = 5): Product[] {
+  // If there's no actual intent, return empty array (don't show all phones)
+  const hasActualIntent = 
+    (intent.budget && (intent.budget.min || intent.budget.max)) ||
+    (intent.brands && intent.brands.length > 0) ||
+    (intent.features && intent.features.length > 0) ||
+    intent.useCase;
+  
+  if (!hasActualIntent) {
+    return [];
+  }
+  
   let results = [...phoneDatabase];
 
   // Filter by budget
@@ -419,6 +532,20 @@ export function searchPhones(intent: SearchIntent, limit: number = 5): Product[]
             score += 0.3;
           }
         }
+        if (featureLower === 'fast charging' && phone.specifications.battery) {
+          // Boost phones with larger batteries (likely to have fast charging)
+          const batteryMatch = phone.specifications.battery.match(/(\d+)/);
+          if (batteryMatch && parseInt(batteryMatch[1]) >= 4500) {
+            score += 0.3;
+          }
+        }
+        if (featureLower === 'compact') {
+          // Boost smaller phones (display size < 6.3")
+          const displayMatch = phone.specifications.display?.match(/(\d+\.?\d*)"/);
+          if (displayMatch && parseFloat(displayMatch[1]) < 6.3) {
+            score += 0.5;
+          }
+        }
       });
     }
 
@@ -458,6 +585,45 @@ export function searchPhones(intent: SearchIntent, limit: number = 5): Product[]
   });
 
   return scoredResults.slice(0, limit).map(item => item.phone);
+}
+
+// Find phones by name (for comparison and follow-up queries)
+export function findPhonesByName(names: string[]): Product[] {
+  const found: Product[] = [];
+  const lowerNames = names.map(n => n.toLowerCase().trim());
+  
+  for (const phone of phoneDatabase) {
+    const phoneName = `${phone.brand} ${phone.name}`.toLowerCase();
+    for (const searchName of lowerNames) {
+      // Check if search name matches phone name or brand
+      if (phoneName.includes(searchName) || 
+          phone.brand.toLowerCase().includes(searchName) ||
+          phone.name.toLowerCase().includes(searchName)) {
+        found.push(phone);
+        break;
+      }
+    }
+  }
+  
+  return found;
+}
+
+// Extract phone names from comparison query (e.g., "Pixel 8a vs OnePlus 12R")
+export function extractPhoneNamesFromComparison(query: string): string[] {
+  const comparisonPatterns = [
+    /compare\s+(.+?)\s+vs\s+(.+?)(?:\?|$)/i,
+    /(.+?)\s+vs\s+(.+?)(?:\?|$)/i,
+    /compare\s+(.+?)\s+and\s+(.+?)(?:\?|$)/i,
+  ];
+  
+  for (const pattern of comparisonPatterns) {
+    const match = query.match(pattern);
+    if (match) {
+      return [match[1].trim(), match[2].trim()];
+    }
+  }
+  
+  return [];
 }
 
 export function getPhoneById(id: string): Product | undefined {

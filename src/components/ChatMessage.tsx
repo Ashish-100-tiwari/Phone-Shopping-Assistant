@@ -58,8 +58,8 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           )}
         </div>
 
-        {/* Products Display */}
-        {message.products && message.products.length > 0 && (
+        {/* Products Display - Only show if products exist and array is not empty */}
+        {message.products && Array.isArray(message.products) && message.products.length > 0 && (
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
             {message.products.map((product) => (
               <ProductCard key={product.id} product={product} />
